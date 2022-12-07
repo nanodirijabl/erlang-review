@@ -2,8 +2,8 @@
 
 -define(ACTUAL_FORMAT_VERSION, 5).
 -type timestamp() :: o_B:timestamp_ms().
--type metadata() :: o_B:md().
--type metadata_light() :: o_B:md(light).
+-type metadata() :: o_C:md().
+-type metadata_light() :: o_C:md(light).
 
 -type some_state() :: #{
     version := ?ACTUAL_FORMAT_VERSION,
