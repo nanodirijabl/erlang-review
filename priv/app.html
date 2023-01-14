@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chattie</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+        }
+
+        #rooms-list li {
+            display: inline-block;
+            list-style: none;
+            text-decoration: underline dashed;
+            margin: 0px 10px;
+        }
+
+        #rooms-list li:hover {
+            cursor: pointer;
+        }
+
+        #messages-container {
+            height: 100%;
+            overflow-y: scroll;
+            position: relative;
+            margin: 0;
+            background-color: bisque;
+        }
+
+        #inputs {
+            position: absolute;
+            bottom: 0;
+            margin: 0;
+            width: 100%;
+            background-color: cadetblue;
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+
+<main>
+    <div id="messages-container"></div>
+    <div id="inputs">
+        <ul id="rooms-list"></ul>
+        <div>
+            <span>@</span><input type="text" id="username" placeholder="Your username" maxlength="40">
+            <span>#</span><input type="text" id="room" placeholder="Join or create room" maxlength="20">
+            <textarea type="text" id="message" placeholder="Enter your message"></textarea>
+            <button id="send">Send</button>
+        </div>
+    </div>
+</main>
+
+<body>
+
+    <script>
+        (() => {
+            class Chattie {
+                constructor(ws) {
+                    this.ws = ws
+                    this.callbacks = {}
+                }
+
+                subscribe() {
+                    this.socket = new WebSocket(this.ws)
+                    this.socket.addEventListener("message", (event) => this.dispatch(JSON.parse(event.data)))
+                    // Try to resubscribe if socket close event received
+                    this.socket.addEventListener("close", () => { this.subscribe() })
+                }
+
+                dispatch(message) {
+                    // {event [errors|rooms|timestamp username text]}
+                    if (typeof this.callbacks[message.event] === "undefined") {
+                        return
+                    }
+
+                    let args
+
+                    if ("error" === message.event) {
+                        args = [message.errors]
+                    }
+
+                    if ("roomsUpdate" === message.event) {
+                        args = [message.rooms]
+                    }
+
+                    if ("newMessage" === message.event) {
+                        args = [message.timestamp, message.username, message.text]
+                    }
+
+                    this.callbacks[message.event].apply(this, args)
+                }
+
+                changeUsername(username) {
+                    this.socket.send(JSON.stringify({ data: { event: "changeUsername", username } }))
+                }
+
+                joinRoom(room) {
+                    this.socket.send(JSON.stringify({ data: { event: "joinRoom", room } }))
+                }
+
+                sendMessage(text) {
+                    this.socket.send(JSON.stringify({ data: { event: "sendMessage", text } }))
+                }
+
+                on(eventName, callback) {
+                    this.callbacks[eventName] = callback
+                }
+            }
+
+            const roomInput = document.getElementById("room")
+            const messagesContainer = document.getElementById("messages-container")
+            const roomsList = document.getElementById("rooms-list")
+            const usernameInput = document.getElementById("username")
+            const messageInput = document.getElementById("message")
+
+            const app = new Chattie("ws://localhost:8888/websocket")
+            app.subscribe()
+
+            app.on("error", (errors) => {
+                let block
+                for (let error of errors) {
+                    block = document.createElement("p")
+                    block.innerHTML = `<i>${error}</i>`
+                    messagesContainer.append(block)
+                }
+            })
+
+            app.on("roomsUpdate", (rooms) => {
+                roomsList.innerHTML = ""
+                let li
+                for (let room of rooms) {
+                    li = document.createElement('li')
+                    li.innerText = "#" + room
+                    li.setAttribute("data-room", room)
+                    roomsList.append(li)
+                }
+            })
+
+            app.on("newMessage", (timestamp, username, text) => {
+                const block = document.createElement("p")
+                block.innerHTML = `[${timestamp}] <b>@${username}</b>: ${text}`
+                messagesContainer.append(block)
+            })
+
+            usernameInput.addEventListener("change", (event) => {
+                const username = event.target.value.trim()
+                if ("" === username) {
+                    return
+                }
+
+                app.changeUsername(username)
+            })
+
+            roomInput.addEventListener("change", (event) => {
+                const room = event.target.value.trim()
+                if ("" === room) {
+                    return
+                }
+
+                app.joinRoom(room)
+            })
+
+            roomsList.addEventListener("click", (event) => {
+                if (!event.target || !event.target.matches("li")) {
+                    return
+                }
+
+                roomInput.value = event.target.getAttribute("data-room")
+                roomInput.dispatchEvent(new Event("change"))
+            })
+
+            messageInput.addEventListener("keydown", (event) => {
+                // "Enter"
+                if (13 !== event.keyCode) {
+                    return
+                }
+
+                event.preventDefault()
+                document.getElementById("send").dispatchEvent(new Event("click"))
+            })
+
+            document.getElementById("send").addEventListener("click", (event) => {
+                event.preventDefault()
+
+                const message = messageInput.value.trim()
+                if ("" === message) {
+                    return
+                }
+
+                app.sendMessage(message)
+                messageInput.value = ""
+                messageInput.focus()
+            })
+        })()
+    </script>
+</body>
+
+</html>
