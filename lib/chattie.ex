@@ -20,13 +20,13 @@ defmodule Chattie do
   Joins room via implicit subscription of current process to room as key in
   `Registry` with duplicates.
   """
-  @spec join_room(atom, binary) :: :ok
-  def join_room(registry, room) do
+  @spec join_room(atom, binary, binary | nil) :: :ok
+  def join_room(registry, room, username) do
     # Count matching room name (as registry entry key)
     room_existed? =
       0 != Registry.count_select(registry, [{{:"$1", :_, :_}, [{:==, :"$1", room}], [true]}])
 
-    {:ok, _pid} = Registry.register(registry, room, [])
+    {:ok, _pid} = Registry.register(registry, room, %{username: username})
 
     unless room_existed? do
       registry

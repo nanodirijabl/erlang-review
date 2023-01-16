@@ -11,18 +11,18 @@ defmodule ChattieTest do
   end
 
   test "join lobby" do
-    Chattie.join_room(ChattieTest.Registry, "lobby")
+    Chattie.join_room(ChattieTest.Registry, "lobby", nil)
     assert Chattie.list_rooms(ChattieTest.Registry) == ["lobby"]
   end
 
   test "join and leave same room" do
-    Chattie.join_room(ChattieTest.Registry, "new_room")
+    Chattie.join_room(ChattieTest.Registry, "new_room", nil)
     Chattie.leave_room(ChattieTest.Registry, "new_room")
     assert Chattie.list_rooms(ChattieTest.Registry) == []
   end
 
   test "messaging between two users and one anonymous spectator" do
-    Chattie.join_room(ChattieTest.Registry, "test_room")
+    Chattie.join_room(ChattieTest.Registry, "test_room", "Bob")
     assert_receive {:rooms_update, ["test_room"]}, 10
 
     joes_message = Chattie.Message.new_now(DateTime.utc_now(), "test_room", "Joe", "Hello, Mike")
@@ -39,7 +39,7 @@ defmodule ChattieTest do
   defp user_send_message(registry, send_message) do
     {:ok, _pid} =
       Task.start_link(fn ->
-        Chattie.join_room(registry, send_message.room)
+        Chattie.join_room(registry, send_message.room, send_message.username)
         Chattie.send_message(registry, send_message)
       end)
   end
@@ -49,7 +49,7 @@ defmodule ChattieTest do
 
     {:ok, _pid} =
       Task.start_link(fn ->
-        Chattie.join_room(registry, receive_message.room)
+        Chattie.join_room(registry, receive_message.room, nil)
 
         report =
           receive do

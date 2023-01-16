@@ -8,6 +8,9 @@ defmodule Chattie.Web.CowboyWebsocket do
 
   alias Chattie.Message, as: Message
 
+  # 1 hour
+  @socket_idle_timeout 3600_000
+
   defmodule State do
     @type t() :: %__MODULE__{username: binary, room: binary}
     defstruct username: nil, room: nil
@@ -15,12 +18,13 @@ defmodule Chattie.Web.CowboyWebsocket do
 
   @impl true
   def init(request, _state) do
-    {:cowboy_websocket, request, %State{username: nil, room: nil}}
+    {:cowboy_websocket, request, %State{username: nil, room: nil},
+     %{idle_timeout: @socket_idle_timeout}}
   end
 
   @impl true
   def websocket_init(%State{} = state) do
-    Chattie.join_room(Chattie.RoomSubscription, "lobby")
+    Chattie.join_room(Chattie.RoomSubscription, "lobby", nil)
     {:ok, %{state | room: "lobby"}}
   end
 
@@ -31,12 +35,17 @@ defmodule Chattie.Web.CowboyWebsocket do
   end
 
   defp handle_chat_event("changeUsername", %{"username" => username}, %State{} = state) do
+    unless state.room == nil do
+      Chattie.leave_room(Chattie.RoomSubscription, state.room)
+      Chattie.join_room(Chattie.RoomSubscription, state.room, username)
+    end
+
     {:ok, %{state | username: username}}
   end
 
   defp handle_chat_event("joinRoom", %{"room" => room}, %State{room: old_room} = state) do
     Chattie.leave_room(Chattie.RoomSubscription, old_room)
-    Chattie.join_room(Chattie.RoomSubscription, room)
+    Chattie.join_room(Chattie.RoomSubscription, room, state.username)
     {:ok, %{state | room: room}}
   end
 
@@ -51,10 +60,8 @@ defmodule Chattie.Web.CowboyWebsocket do
   end
 
   defp handle_chat_event("sendMessage", %{"text" => text}, %State{} = state) do
-    Chattie.send_message(
-      Chattie.RoomSubscription,
-      Message.new_now(DateTime.utc_now(), state.room, state.username, text)
-    )
+    message = Message.new_now(DateTime.utc_now(), state.room, state.username, text)
+    Chattie.send_message(Chattie.RoomSubscription, message)
 
     {:ok, state}
   end

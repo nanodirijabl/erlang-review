@@ -13,7 +13,9 @@ defmodule Chattie.Application do
     children = [
       # Starts a worker by calling: Chattie.Worker.start_link(arg)
       # {Chattie.Worker, arg}
-      {Registry, keys: :duplicate, name: Chattie.RoomSubscription},
+      Chattie.WatchdogBot,
+      {Registry,
+       keys: :duplicate, name: Chattie.RoomSubscription, listeners: [Chattie.WatchdogBot]},
       Plug.Cowboy.child_spec(
         scheme: :http,
         plug: Chattie.Web.PlugStatic,

@@ -2,7 +2,7 @@ defmodule ChattieWebCowboyWebsocketTest do
   use ExUnit.Case, async: true
 
   test "initializing and terminating" do
-    {:cowboy_websocket, _request, state} = Chattie.Web.CowboyWebsocket.init(%{}, [])
+    {:cowboy_websocket, _request, state, _opts} = Chattie.Web.CowboyWebsocket.init(%{}, [])
     assert %Chattie.Web.CowboyWebsocket.State{username: nil, room: nil} == state
 
     {:ok, state} = Chattie.Web.CowboyWebsocket.websocket_init(state)
